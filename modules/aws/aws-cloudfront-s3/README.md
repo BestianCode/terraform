@@ -14,10 +14,6 @@ Key behavior:
 ## Usage
 
 ```hcl
-variable "aws_region" {
-  type    = string
-  default = "us-east-1"
-}
 variable "SSL_CERTIFICATE_ARN" {
   description = "ARN of the SSL certificate for CloudFront distributions"
   type        = string
@@ -29,7 +25,6 @@ module "aws_cloudfront_s3" {
   project_name        = var.project_name
   CLOUDFLARE_ZONE_ID  = var.CLOUDFLARE_ZONE_ID
   SSL_CERTIFICATE_ARN = var.SSL_CERTIFICATE_ARN
-  aws_region          = var.aws_region
 
   aws_buckets_list = [
     {
