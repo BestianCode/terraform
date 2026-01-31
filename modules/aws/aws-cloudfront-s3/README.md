@@ -14,12 +14,22 @@ Key behavior:
 ## Usage
 
 ```hcl
+variable "aws_region" {
+  type    = string
+  default = "us-east-1"
+}
+variable "SSL_CERTIFICATE_ARN" {
+  description = "ARN of the SSL certificate for CloudFront distributions"
+  type        = string
+  default     = null
+}
 module "aws_cloudfront_s3" {
   source = "git::https://github.com/BestianCode/terraform.git//modules/aws/aws-cloudfront-s3?ref=1.2.0"
 
-  project_name       = var.project_name
-  CLOUDFLARE_ZONE_ID = var.CLOUDFLARE_ZONE_ID
+  project_name        = var.project_name
+  CLOUDFLARE_ZONE_ID  = var.CLOUDFLARE_ZONE_ID
   SSL_CERTIFICATE_ARN = var.SSL_CERTIFICATE_ARN
+  aws_region          = var.aws_region
 
   aws_buckets_list = [
     {
