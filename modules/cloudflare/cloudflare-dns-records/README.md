@@ -10,7 +10,7 @@ Key behavior:
 
 ```hcl
 module "cloudflare_dns_records" {
-  source          = "git::https://github.com/BestianCode/terraform.git//modules/cloudflare/cloudflare-dns-records?ref=1.1.0"
+  source          = "git::https://github.com/BestianCode/terraform.git//modules/cloudflare/cloudflare-dns-records?ref=1.2.0"
   default_zone_id = var.CLOUDFLARE_ZONE_ID
 
   records = [

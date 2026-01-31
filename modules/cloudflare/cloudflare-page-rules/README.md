@@ -11,7 +11,7 @@ Example forwarding URL 301 rule:
 
 ```hcl
 module "cloudflare_page_rules" {
-  source          = "git::https://github.com/BestianCode/terraform.git//modules/cloudflare/cloudflare-page-rules?ref=1.1.0"
+  source          = "git::https://github.com/BestianCode/terraform.git//modules/cloudflare/cloudflare-page-rules?ref=1.2.0"
   default_zone_id = var.CLOUDFLARE_ZONE_ID
 
   page_rules = [
