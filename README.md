@@ -6,3 +6,5 @@ This repository contains reusable Terraform modules.
 
 - [modules/cloudflare/cloudflare-dns-records](modules/cloudflare/cloudflare-dns-records)
   - Create multiple Cloudflare DNS records.
+- [modules/cloudflare/cloudflare-page-rules](modules/cloudflare/cloudflare-page-rules)
+  - Create multiple Cloudflare Page Rules.
