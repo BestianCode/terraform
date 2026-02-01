@@ -34,6 +34,9 @@ module "aws_cloudfront_s3" {
       dns_name   = "media.example.com"
       # zone_id  = "" # optional per-bucket override
 
+      # Optional per-bucket override (if omitted, module-level SSL_CERTIFICATE_ARN is used)
+      # ssl_certificate_arn = "arn:aws:acm:us-east-1:123456789012:certificate/xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+
       create_read_write = true
       read_write_allow_delete = true
 
@@ -60,6 +63,7 @@ module "aws_cloudfront_s3" {
   - `dns_name` (string, optional): If set, creates Cloudflare DNS record.
   - `zone_id` (string, optional): Per-bucket Cloudflare zone override.
   - `cloudfront` (bool, optional): If true, creates a CloudFront distribution.
+  - `ssl_certificate_arn` (string, optional): Per-bucket ACM cert ARN for CloudFront (us-east-1). If omitted, falls back to module input `SSL_CERTIFICATE_ARN`.
   - `soft_delete_days` (number, optional): Noncurrent version expiration.
   - `retention_days` (number, optional): Delete objects after N days.
   - `cors` (list(object), optional)

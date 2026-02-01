@@ -91,6 +91,17 @@ resource "aws_cloudfront_origin_access_control" "s3_oac" {
 # CloudFront Distribution
 resource "aws_cloudfront_distribution" "s3_distribution" {
   for_each = { for b in var.aws_buckets_list : b.name => b if b.public && b.cloudfront == true }
+
+  lifecycle {
+    precondition {
+      condition = (
+        try(each.value.dns_name, null) == null ||
+        coalesce(try(each.value.ssl_certificate_arn, null), var.SSL_CERTIFICATE_ARN) != null
+      )
+      error_message = "When aws_buckets_list[*].dns_name is set (aliases enabled), you must set either aws_buckets_list[*].ssl_certificate_arn or module input SSL_CERTIFICATE_ARN."
+    }
+  }
+
   origin {
     domain_name              = aws_s3_bucket.buckets[each.key].bucket_regional_domain_name
     origin_access_control_id = aws_cloudfront_origin_access_control.s3_oac[each.key].id
@@ -140,7 +151,7 @@ resource "aws_cloudfront_distribution" "s3_distribution" {
     Name = "${each.key}-cloudfront"
   }
   viewer_certificate {
-    acm_certificate_arn            = each.value.dns_name != null ? var.SSL_CERTIFICATE_ARN : null
+    acm_certificate_arn            = each.value.dns_name != null ? coalesce(try(each.value.ssl_certificate_arn, null), var.SSL_CERTIFICATE_ARN) : null
     ssl_support_method             = each.value.dns_name != null ? "sni-only" : null
     minimum_protocol_version       = each.value.dns_name != null ? "TLSv1.2_2021" : null
     cloudfront_default_certificate = each.value.dns_name == null ? true : false
