@@ -274,8 +274,55 @@ resource "cloudflare_page_rule" "s3_ssl_off" {
 }
 
 locals {
-  bucket_arns             = { for k, b in aws_s3_bucket.buckets : k => b.arn }
-  read_write_allow_delete = { for b in var.aws_buckets_list : b.name => try(b.read_write_allow_delete, false) }
+  bucket_arns                  = { for k, b in aws_s3_bucket.buckets : k => b.arn }
+  cloudfront_distribution_arns = { for k, d in aws_cloudfront_distribution.s3_distribution : k => d.arn }
+  read_write_allow_delete      = { for b in var.aws_buckets_list : b.name => try(b.read_write_allow_delete, false) }
+}
+
+resource "aws_iam_user" "bucket_admin" {
+  for_each = { for b in var.aws_buckets_list : b.name => b if b.create_admin }
+  name     = "${var.project_name}_s3_${each.key}_admin"
+}
+
+resource "aws_iam_user_policy" "bucket_admin_policy" {
+  for_each = aws_iam_user.bucket_admin
+  name     = "${each.key}-admin-policy"
+  user     = each.value.name
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = concat(
+      [
+        {
+          Effect = "Allow"
+          Action = "s3:*"
+          Resource = [
+            local.bucket_arns[each.key],
+            "${local.bucket_arns[each.key]}/*",
+          ]
+        },
+      ],
+      try(local.cloudfront_distribution_arns[each.key], null) != null ? [
+        {
+          Effect = "Allow"
+          Action = [
+            "cloudfront:ListDistributions",
+          ]
+          Resource = "*"
+        },
+        {
+          Effect = "Allow"
+          Action = [
+            "cloudfront:CreateInvalidation",
+            "cloudfront:GetDistribution",
+            "cloudfront:GetInvalidation",
+            "cloudfront:ListInvalidations",
+          ]
+          Resource = local.cloudfront_distribution_arns[each.key]
+        }
+      ] : []
+    )
+  })
 }
 
 locals {

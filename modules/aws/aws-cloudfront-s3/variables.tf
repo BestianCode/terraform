@@ -31,6 +31,7 @@ variable "aws_buckets_list" {
       exposed_headers = optional(list(string))
       max_age_seconds = optional(number)
     })))
+    create_admin                 = optional(bool, false)
     read_write_allow_delete      = optional(bool, false)
     enable_versioning            = optional(bool, false)
     kms_key_arn                  = optional(string)
