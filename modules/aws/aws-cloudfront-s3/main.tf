@@ -284,6 +284,11 @@ resource "aws_iam_user" "bucket_admin" {
   name     = "${var.project_name}_s3_${each.key}_admin"
 }
 
+resource "aws_iam_user" "bucket_read_write" {
+  for_each = { for b in var.aws_buckets_list : b.name => b if b.create_read_write }
+  name     = "${var.project_name}_s3_${each.key}_read_write"
+}
+
 resource "aws_iam_user_policy" "bucket_admin_policy" {
   for_each = aws_iam_user.bucket_admin
   name     = "${each.key}-admin-policy"
@@ -300,6 +305,49 @@ resource "aws_iam_user_policy" "bucket_admin_policy" {
             local.bucket_arns[each.key],
             "${local.bucket_arns[each.key]}/*",
           ]
+        },
+      ],
+      try(local.cloudfront_distribution_arns[each.key], null) != null ? [
+        {
+          Effect = "Allow"
+          Action = [
+            "cloudfront:ListDistributions",
+          ]
+          Resource = "*"
+        },
+        {
+          Effect = "Allow"
+          Action = [
+            "cloudfront:CreateInvalidation",
+            "cloudfront:GetDistribution",
+            "cloudfront:GetInvalidation",
+            "cloudfront:ListInvalidations",
+          ]
+          Resource = local.cloudfront_distribution_arns[each.key]
+        }
+      ] : []
+    )
+  })
+}
+
+resource "aws_iam_user_policy" "bucket_read_write_policy" {
+  for_each = aws_iam_user.bucket_read_write
+  name     = "${each.key}-rw-policy"
+  user     = each.value.name
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = concat(
+      [
+        {
+          Effect   = "Allow"
+          Action   = ["s3:ListBucket", "s3:GetBucketLocation"]
+          Resource = local.bucket_arns[each.key]
+        },
+        {
+          Effect   = "Allow"
+          Action   = concat(["s3:GetObject", "s3:PutObject"], lookup(local.read_write_allow_delete, each.key, false) ? ["s3:DeleteObject"] : [])
+          Resource = "${local.bucket_arns[each.key]}/*"
         },
       ],
       try(local.cloudfront_distribution_arns[each.key], null) != null ? [

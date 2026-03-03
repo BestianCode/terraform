@@ -15,7 +15,7 @@ Key behavior:
 - Optional KMS key and alias can be created per bucket.
 - Lifecycle supports soft-delete, retention expiration, and Glacier/Deep Archive transitions.
 - You can manage named IAM users via `iam_users` with roles: `read`, `write`, `read+write`, `admin`.
-- Legacy `create_*` IAM user flags are removed except `create_admin`.
+- Legacy `create_*` IAM user flags are removed except `create_admin` and `create_read_write`.
 
 
 ## Usage
@@ -45,6 +45,7 @@ module "aws_cloudfront_s3" {
       # ssl_certificate_arn = "arn:aws:acm:us-east-1:123456789012:certificate/xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
 
       create_admin            = false
+      create_read_write       = false
       read_write_allow_delete = true
 
       kms_key_create     = true
@@ -96,6 +97,7 @@ module "aws_cloudfront_s3" {
   - `glacier_storage_class` (string, optional): `GLACIER`, `GLACIER_IR`, or `DEEP_ARCHIVE`.
   - `cors` (list(object), optional)
   - `create_admin` (bool, optional): Creates legacy admin IAM user `${project_name}_s3_${bucket}_admin`.
+  - `create_read_write` (bool, optional): Creates legacy read-write IAM user `${project_name}_s3_${bucket}_read_write`.
   - `read_write_allow_delete` (bool, optional): Enables `s3:DeleteObject` for users with `iam_users.role = "read+write"`.
   - `enable_versioning` (bool, optional)
   - `kms_key_arn` (string, optional): Existing KMS key ARN for bucket encryption.
