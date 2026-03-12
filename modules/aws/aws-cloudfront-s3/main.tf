@@ -159,7 +159,11 @@ resource "aws_cloudfront_function" "viewer_request" {
     if b.public && b.cloudfront == true && lookup(b, "cloudfront_viewer_request_function_enabled", false)
   }
 
-  name    = "${each.key}-viewer-request"
+  name = format(
+    "%s-%s",
+    substr(regexreplace(each.key, "[^a-zA-Z0-9-_]", "-"), 0, 55),
+    substr(md5(each.key), 0, 8)
+  )
   runtime = "cloudfront-js-1.0"
   comment = "Viewer request function for ${each.key}"
   publish = true
