@@ -16,14 +16,16 @@ variable "SSL_CERTIFICATE_ARN" {
 
 variable "aws_buckets_list" {
   type = list(object({
-    name                = string
-    public              = bool
-    soft_delete_days    = optional(number)
-    retention_days      = optional(number)
-    dns_name            = optional(string)
-    zone_id             = optional(string, "")
-    cloudfront          = optional(bool, false)
-    ssl_certificate_arn = optional(string)
+    name                                       = string
+    public                                     = bool
+    soft_delete_days                           = optional(number)
+    retention_days                             = optional(number)
+    dns_name                                   = optional(string)
+    zone_id                                    = optional(string, "")
+    cloudfront                                 = optional(bool, false)
+    ssl_certificate_arn                        = optional(string)
+    cloudfront_viewer_request_function_enabled = optional(bool, false)
+    cloudfront_viewer_request_function_code    = optional(string)
     cors = optional(list(object({
       allowed_origins = list(string)
       allowed_methods = list(string)

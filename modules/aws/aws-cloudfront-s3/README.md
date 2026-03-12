@@ -6,6 +6,9 @@ Also creates Cloudflare DNS records for the bucket hostname (and a Page Rule to 
 Key behavior:
 
 - If `aws_buckets_list[*].cloudfront == true`, the module creates a CloudFront distribution and an S3 bucket policy that allows CloudFront to read objects.
+- You can optionally attach a CloudFront `viewer-request` function per bucket to rewrite URLs (default behavior appends `index.html` for trailing `/` and `.html` for extensionless paths).
+  - Set `cloudfront_viewer_request_function_enabled = true`.
+  - Optionally provide `cloudfront_viewer_request_function_code` to override default JS code.
 - If `aws_buckets_list[*].public == true` and `cloudfront != true`, the module configures S3 Website hosting and attaches a public-read bucket policy.
   - This can fail if S3 Block Public Access (account-level or org/SCP) prevents public policies.
 - If a bucket item does not specify `zone_id` (or it is an empty string), the module uses `CLOUDFLARE_ZONE_ID`.
@@ -27,7 +30,7 @@ variable "SSL_CERTIFICATE_ARN" {
   default     = null
 }
 module "aws_cloudfront_s3" {
-  source = "git::https://github.com/BestianCode/terraform.git//modules/aws/aws-cloudfront-s3?ref=1.3.0"
+  source = "git::https://github.com/BestianCode/terraform.git//modules/aws/aws-cloudfront-s3?ref=1.4.0"
 
   project_name        = var.project_name
   CLOUDFLARE_ZONE_ID  = var.CLOUDFLARE_ZONE_ID
@@ -40,6 +43,25 @@ module "aws_cloudfront_s3" {
       cloudfront = true
       dns_name   = "media.example.com"
       # zone_id  = "" # optional per-bucket override
+
+      cloudfront_viewer_request_function_enabled = true
+      # Optional custom CloudFront function code. If omitted, module uses default:
+      # - /path/      -> /path/index.html
+      # - /about      -> /about.html
+      # cloudfront_viewer_request_function_code = <<-EOT
+      # function handler(event) {
+      #   var req = event.request;
+      #   var uri = req.uri;
+      #
+      #   if (uri.endsWith('/')) {
+      #     req.uri += 'index.html';
+      #   } else if (!uri.includes('.')) {
+      #     req.uri += '.html';
+      #   }
+      #
+      #   return req;
+      # }
+      # EOT
 
       # Optional per-bucket override (if omitted, module-level SSL_CERTIFICATE_ARN is used)
       # ssl_certificate_arn = "arn:aws:acm:us-east-1:123456789012:certificate/xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
@@ -91,6 +113,8 @@ module "aws_cloudfront_s3" {
   - `zone_id` (string, optional): Per-bucket Cloudflare zone override.
   - `cloudfront` (bool, optional): If true, creates a CloudFront distribution.
   - `ssl_certificate_arn` (string, optional): Per-bucket ACM cert ARN for CloudFront (us-east-1). If omitted, falls back to module input `SSL_CERTIFICATE_ARN`.
+  - `cloudfront_viewer_request_function_enabled` (bool, optional): If true, creates and attaches a CloudFront Function on `viewer-request`.
+  - `cloudfront_viewer_request_function_code` (string, optional): Custom CloudFront Function JS code. If omitted and enabled, module uses default HTML rewrite logic.
   - `soft_delete_days` (number, optional): Noncurrent version expiration.
   - `retention_days` (number, optional): Delete objects after N days.
   - `glacier_transition_days` (number, optional): Transition objects to Glacier storage class after N days.

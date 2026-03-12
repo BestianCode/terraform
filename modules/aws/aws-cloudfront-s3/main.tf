@@ -136,6 +136,40 @@ resource "aws_cloudfront_origin_access_control" "s3_oac" {
   signing_protocol                  = "sigv4"
 }
 
+locals {
+  default_cloudfront_viewer_request_function_code = <<-EOT
+    function handler(event) {
+      var req = event.request;
+      var uri = req.uri;
+
+      if (uri.endsWith('/')) {
+        req.uri += 'index.html';
+      } else if (!uri.includes('.')) {
+        req.uri += '.html';
+      }
+
+      return req;
+    }
+  EOT
+}
+
+resource "aws_cloudfront_function" "viewer_request" {
+  for_each = {
+    for b in var.aws_buckets_list : b.name => b
+    if b.public && b.cloudfront == true && lookup(b, "cloudfront_viewer_request_function_enabled", false)
+  }
+
+  name    = "${each.key}-viewer-request"
+  runtime = "cloudfront-js-1.0"
+  comment = "Viewer request function for ${each.key}"
+  publish = true
+
+  code = coalesce(
+    try(each.value.cloudfront_viewer_request_function_code, null),
+    local.default_cloudfront_viewer_request_function_code
+  )
+}
+
 resource "aws_cloudfront_distribution" "s3_distribution" {
   for_each = { for b in var.aws_buckets_list : b.name => b if b.public && b.cloudfront == true }
 
@@ -165,6 +199,13 @@ resource "aws_cloudfront_distribution" "s3_distribution" {
     allowed_methods  = ["DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT"]
     cached_methods   = ["GET", "HEAD"]
     target_origin_id = "S3-${each.key}"
+    dynamic "function_association" {
+      for_each = try([aws_cloudfront_function.viewer_request[each.key].arn], [])
+      content {
+        event_type   = "viewer-request"
+        function_arn = function_association.value
+      }
+    }
     forwarded_values {
       query_string = false
       cookies {
