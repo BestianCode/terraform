@@ -286,47 +286,36 @@ resource "aws_s3_bucket_policy" "cloudfront_policy" {
 }
 
 resource "cloudflare_dns_record" "cloudfront_website" {
-  for_each = {
-    for b in var.aws_buckets_list :
-    "${b.name}::${b.zone_id != "" ? b.zone_id : var.CLOUDFLARE_ZONE_ID}" => merge(b, {
-      effective_zone_id = b.zone_id != "" ? b.zone_id : var.CLOUDFLARE_ZONE_ID
-    }) if b.dns_name != null && b.cloudfront == true
-  }
-  zone_id = each.value.effective_zone_id
-  name    = each.value.dns_name
-  type    = "CNAME"
-  ttl     = 1
-  proxied = false
-  comment = "Managed by Terraform - CloudFront distribution"
-  content = aws_cloudfront_distribution.s3_distribution[each.value.name].domain_name
+  for_each = { for b in var.aws_buckets_list : b.name => b if b.dns_name != null && b.cloudfront == true }
+  zone_id  = each.value.zone_id != "" ? each.value.zone_id : var.CLOUDFLARE_ZONE_ID
+  name     = each.value.dns_name
+  type     = "CNAME"
+  ttl      = 1
+  proxied  = false
+  comment  = "Managed by Terraform - CloudFront distribution"
+  content  = aws_cloudfront_distribution.s3_distribution[each.key].domain_name
 }
 
 resource "cloudflare_dns_record" "s3_website" {
-  for_each = {
-    for b in var.aws_buckets_list :
-    "${b.name}::${b.zone_id != "" ? b.zone_id : var.CLOUDFLARE_ZONE_ID}" => merge(b, {
-      effective_zone_id = b.zone_id != "" ? b.zone_id : var.CLOUDFLARE_ZONE_ID
-    }) if b.public && b.dns_name != null && b.cloudfront != true
-  }
-  zone_id = each.value.effective_zone_id
-  name    = each.value.dns_name
-  type    = "CNAME"
-  ttl     = 1
-  proxied = true
-  comment = "Managed by Terraform - S3 website endpoint"
-  content = aws_s3_bucket.buckets[each.value.name].website_endpoint
+  for_each = { for b in var.aws_buckets_list : b.name => b if b.public && b.dns_name != null && b.cloudfront != true }
+  zone_id  = each.value.zone_id != "" ? each.value.zone_id : var.CLOUDFLARE_ZONE_ID
+  name     = each.value.dns_name
+  type     = "CNAME"
+  ttl      = 1
+  proxied  = true
+  comment  = "Managed by Terraform - S3 website endpoint"
+  content  = aws_s3_bucket.buckets[each.key].website_endpoint
+}
+
+locals {
+  s3_ssl_off_rules = { for b in var.aws_buckets_list : b.name => b if b.public && b.dns_name != null && b.cloudfront != true }
 }
 
 resource "cloudflare_page_rule" "s3_ssl_off" {
-  for_each = {
-    for b in var.aws_buckets_list :
-    "${b.name}::${b.zone_id != "" ? b.zone_id : var.CLOUDFLARE_ZONE_ID}" => merge(b, {
-      effective_zone_id = b.zone_id != "" ? b.zone_id : var.CLOUDFLARE_ZONE_ID
-    }) if b.public && b.dns_name != null && b.cloudfront != true
-  }
-  zone_id  = each.value.effective_zone_id
+  for_each = local.s3_ssl_off_rules
+  zone_id  = each.value.zone_id != "" ? each.value.zone_id : var.CLOUDFLARE_ZONE_ID
   target   = "${each.value.dns_name}/*"
-  priority = 1000
+  priority = 1000 + index(sort(keys(local.s3_ssl_off_rules)), each.key)
   status   = "active"
   actions = {
     ssl = "off"
