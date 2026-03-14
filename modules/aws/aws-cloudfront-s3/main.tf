@@ -315,7 +315,7 @@ resource "cloudflare_page_rule" "s3_ssl_off" {
   for_each = local.s3_ssl_off_rules
   zone_id  = each.value.zone_id != "" ? each.value.zone_id : var.CLOUDFLARE_ZONE_ID
   target   = "${each.value.dns_name}/*"
-  priority = 1000 + index(sort(keys(local.s3_ssl_off_rules)), each.key)
+  priority = 100 + index(sort(keys(local.s3_ssl_off_rules)), each.key)
   status   = "active"
   actions = {
     ssl = "off"
