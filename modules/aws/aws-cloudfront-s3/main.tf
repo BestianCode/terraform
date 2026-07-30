@@ -179,6 +179,7 @@ locals {
         }
         if alias != local.cloudfront_primary_alias_by_bucket[bucket.name]
       ]
+      if bucket.public && bucket.cloudfront == true
     ]) : entry.key => entry
   }
 }
