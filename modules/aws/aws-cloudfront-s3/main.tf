@@ -151,6 +151,36 @@ locals {
       return req;
     }
   EOT
+
+  cloudfront_aliases_by_bucket = {
+    for bucket in var.aws_buckets_list : bucket.name => distinct(concat(
+      try(bucket.dns_name, null) != null ? [bucket.dns_name] : [],
+      try(bucket.dns_names, [])
+    ))
+    if bucket.public && bucket.cloudfront == true
+  }
+
+  cloudfront_primary_alias_by_bucket = {
+    for bucket in var.aws_buckets_list : bucket.name => coalesce(
+      try(bucket.dns_name, null),
+      try(bucket.dns_names[0], null)
+    )
+    if bucket.public && bucket.cloudfront == true && length(local.cloudfront_aliases_by_bucket[bucket.name]) > 0
+  }
+
+  cloudfront_additional_dns_records = {
+    for entry in flatten([
+      for bucket in var.aws_buckets_list : [
+        for alias in try(local.cloudfront_aliases_by_bucket[bucket.name], []) : {
+          key      = "${bucket.name}:${alias}"
+          bucket   = bucket.name
+          dns_name = alias
+          zone_id  = bucket.zone_id
+        }
+        if alias != local.cloudfront_primary_alias_by_bucket[bucket.name]
+      ]
+    ]) : entry.key => entry
+  }
 }
 
 resource "aws_cloudfront_function" "viewer_request" {
@@ -180,10 +210,10 @@ resource "aws_cloudfront_distribution" "s3_distribution" {
   lifecycle {
     precondition {
       condition = (
-        try(each.value.dns_name, null) == null ||
+        length(local.cloudfront_aliases_by_bucket[each.key]) == 0 ||
         coalesce(try(each.value.ssl_certificate_arn, null), var.SSL_CERTIFICATE_ARN) != null
       )
-      error_message = "When aws_buckets_list[*].dns_name is set (aliases enabled), you must set either aws_buckets_list[*].ssl_certificate_arn or module input SSL_CERTIFICATE_ARN."
+      error_message = "When aws_buckets_list[*].dns_name or aws_buckets_list[*].dns_names is set (aliases enabled), you must set either aws_buckets_list[*].ssl_certificate_arn or module input SSL_CERTIFICATE_ARN."
     }
   }
 
@@ -197,7 +227,7 @@ resource "aws_cloudfront_distribution" "s3_distribution" {
   is_ipv6_enabled     = true
   comment             = "CloudFront distribution for ${each.key}"
   default_root_object = "index.html"
-  aliases             = each.value.dns_name != null ? [each.value.dns_name] : []
+  aliases             = local.cloudfront_aliases_by_bucket[each.key]
 
   default_cache_behavior {
     allowed_methods  = ["DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT"]
@@ -249,10 +279,10 @@ resource "aws_cloudfront_distribution" "s3_distribution" {
   }
 
   viewer_certificate {
-    acm_certificate_arn            = each.value.dns_name != null ? coalesce(try(each.value.ssl_certificate_arn, null), var.SSL_CERTIFICATE_ARN) : null
-    ssl_support_method             = each.value.dns_name != null ? "sni-only" : null
-    minimum_protocol_version       = each.value.dns_name != null ? "TLSv1.2_2021" : null
-    cloudfront_default_certificate = each.value.dns_name == null ? true : false
+    acm_certificate_arn            = length(local.cloudfront_aliases_by_bucket[each.key]) > 0 ? coalesce(try(each.value.ssl_certificate_arn, null), var.SSL_CERTIFICATE_ARN) : null
+    ssl_support_method             = length(local.cloudfront_aliases_by_bucket[each.key]) > 0 ? "sni-only" : null
+    minimum_protocol_version       = length(local.cloudfront_aliases_by_bucket[each.key]) > 0 ? "TLSv1.2_2021" : null
+    cloudfront_default_certificate = length(local.cloudfront_aliases_by_bucket[each.key]) == 0 ? true : false
   }
 }
 
@@ -286,14 +316,25 @@ resource "aws_s3_bucket_policy" "cloudfront_policy" {
 }
 
 resource "cloudflare_dns_record" "cloudfront_website" {
-  for_each = { for b in var.aws_buckets_list : b.name => b if b.dns_name != null && b.cloudfront == true }
+  for_each = { for b in var.aws_buckets_list : b.name => b if try(local.cloudfront_primary_alias_by_bucket[b.name], null) != null }
+  zone_id  = each.value.zone_id != "" ? each.value.zone_id : var.CLOUDFLARE_ZONE_ID
+  name     = local.cloudfront_primary_alias_by_bucket[each.key]
+  type     = "CNAME"
+  ttl      = 1
+  proxied  = false
+  comment  = "Managed by Terraform - CloudFront distribution"
+  content  = aws_cloudfront_distribution.s3_distribution[each.key].domain_name
+}
+
+resource "cloudflare_dns_record" "cloudfront_aliases" {
+  for_each = local.cloudfront_additional_dns_records
   zone_id  = each.value.zone_id != "" ? each.value.zone_id : var.CLOUDFLARE_ZONE_ID
   name     = each.value.dns_name
   type     = "CNAME"
   ttl      = 1
   proxied  = false
   comment  = "Managed by Terraform - CloudFront distribution"
-  content  = aws_cloudfront_distribution.s3_distribution[each.key].domain_name
+  content  = aws_cloudfront_distribution.s3_distribution[each.value.bucket].domain_name
 }
 
 resource "cloudflare_dns_record" "s3_website" {

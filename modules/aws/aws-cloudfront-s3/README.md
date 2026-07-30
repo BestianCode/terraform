@@ -6,6 +6,7 @@ Also creates Cloudflare DNS records for the bucket hostname (and a Page Rule to 
 Key behavior:
 
 - If `aws_buckets_list[*].cloudfront == true`, the module creates a CloudFront distribution and an S3 bucket policy that allows CloudFront to read objects.
+- CloudFront aliases can be set with `dns_names`; the module creates one Cloudflare CNAME record for each alias.
 - You can optionally attach a CloudFront `viewer-request` function per bucket to rewrite URLs (default behavior appends `index.html` for trailing `/` and `.html` for extensionless paths).
   - Set `cloudfront_viewer_request_function_enabled = true`.
   - Optionally provide `cloudfront_viewer_request_function_code` to override default JS code.
@@ -30,7 +31,7 @@ variable "SSL_CERTIFICATE_ARN" {
   default     = null
 }
 module "aws_cloudfront_s3" {
-  source = "git::https://github.com/BestianCode/terraform.git//modules/aws/aws-cloudfront-s3?ref=1.4.0"
+  source = "git::https://github.com/BestianCode/terraform.git//modules/aws/aws-cloudfront-s3?ref=1.5.0"
 
   project_name        = var.project_name
   CLOUDFLARE_ZONE_ID  = var.CLOUDFLARE_ZONE_ID
@@ -41,7 +42,7 @@ module "aws_cloudfront_s3" {
       name       = "media.example.com"
       public     = true
       cloudfront = true
-      dns_name   = "media.example.com"
+      dns_names  = ["cdn.example.com", "cdn-dev.example.com"]
       # zone_id  = "" # optional per-bucket override
 
       cloudfront_viewer_request_function_enabled = true
@@ -109,7 +110,8 @@ module "aws_cloudfront_s3" {
 - `aws_buckets_list` (list(object), optional): Buckets to create.
   - `name` (string)
   - `public` (bool)
-  - `dns_name` (string, optional): If set, creates Cloudflare DNS record.
+  - `dns_name` (string, optional): Legacy single CloudFront alias and Cloudflare DNS record. It can be combined with `dns_names` and is retained as the primary DNS record for state compatibility.
+  - `dns_names` (list(string), optional): CloudFront aliases and Cloudflare DNS records. Each alias must be covered by the configured ACM certificate.
   - `zone_id` (string, optional): Per-bucket Cloudflare zone override.
   - `cloudfront` (bool, optional): If true, creates a CloudFront distribution.
   - `ssl_certificate_arn` (string, optional): Per-bucket ACM cert ARN for CloudFront (us-east-1). If omitted, falls back to module input `SSL_CERTIFICATE_ARN`.
@@ -135,5 +137,5 @@ module "aws_cloudfront_s3" {
 
 ## Notes
 
-- Configure AWS and Cloudflare providers (credentials, regions, tokens) in the calling root module, not inside this module.
-- For CloudFront with aliases (`dns_name`), either set per-bucket `ssl_certificate_arn` or module-level `SSL_CERTIFICATE_ARN`.
+- Configure AWS `~> 6.57` and Cloudflare providers (credentials, regions, tokens) in the calling root module, not inside this module.
+- For CloudFront with aliases (`dns_name` and/or `dns_names`), either set per-bucket `ssl_certificate_arn` or module-level `SSL_CERTIFICATE_ARN`. The ACM certificate must be in `us-east-1` and include every alias.

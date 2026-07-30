@@ -21,6 +21,7 @@ variable "aws_buckets_list" {
     soft_delete_days                           = optional(number)
     retention_days                             = optional(number)
     dns_name                                   = optional(string)
+    dns_names                                  = optional(list(string), [])
     zone_id                                    = optional(string, "")
     cloudfront                                 = optional(bool, false)
     ssl_certificate_arn                        = optional(string)
